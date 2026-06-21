@@ -554,3 +554,242 @@ a:hover {
   .tier-grid { grid-template-columns: 1fr; }
   .silicon-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Company detail page ──────────────────────────────────────────────────── */
+.co-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.co-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.co-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.co-source {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg3);
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+}
+
+.co-price-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.co-price-main {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.co-price {
+  font-size: 2.2rem;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--text);
+}
+
+.co-change {
+  font-size: 1rem;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.co-change-5d {
+  font-size: 0.85rem;
+  font-family: monospace;
+  color: var(--text-muted);
+}
+
+.co-day-range {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.co-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.co-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.3rem;
+}
+
+.co-val {
+  font-family: monospace;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+/* Volume block */
+.co-section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.co-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.co-vol-block {
+  border-color: rgba(234,179,8,0.2);
+}
+
+.co-vol-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.co-vol-item {
+  min-width: 100px;
+}
+
+.co-vol-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+}
+
+.co-vol-value {
+  font-size: 1.3rem;
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.co-vol-divider {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.co-vol-ratio-block {
+  border-left: 1px solid var(--border);
+  padding-left: 1.5rem;
+}
+
+.co-vol-ratio {
+  font-size: 1.5rem;
+  font-family: monospace;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+
+/* Stat grid */
+.co-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.co-stat-grid-wide {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.co-stat {
+  min-width: 0;
+}
+
+.co-stat-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.2rem;
+}
+
+.co-stat-val {
+  font-size: 1.1rem;
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.co-stat-sub {
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
+}
+
+/* 52-week range bar */
+.co-52w-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.co-52w-bound {
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.co-52w-bar-wrap {
+  flex: 1;
+}
+
+.co-52w-bar {
+  position: relative;
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.co-52w-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: var(--accent-hover);
+  border-radius: 50%;
+  border: 2px solid var(--bg2);
+}
+
+@media (max-width: 640px) {
+  .co-price { font-size: 1.6rem; }
+  .co-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .co-vol-row { gap: 1rem; }
+  .co-vol-ratio-block { border-left: none; padding-left: 0; }
+}

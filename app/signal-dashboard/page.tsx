@@ -1,17 +1,31 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { COMPANIES, TIERS } from '@/lib/companies'
 import { getWeight, getLabel } from '@/lib/chokepoint-weights'
 
 interface PriceData {
   ticker: string
   price: number | null
-  change1d: number | null
+  change: number | null
+  changePct: number | null
   change5d: number | null
+  open: number | null
+  high: number | null
+  low: number | null
   volume: number | null
+  volumeAvg: number | null
+  marketCap: number | null
+  pe: number | null
+  eps: number | null
+  high52: number | null
+  low52: number | null
+  beta: number | null
+  sma50: number | null
+  sma200: number | null
+  rsi14: number | null
   source: string
-  error?: string
 }
 
 interface DealFlag {
@@ -22,40 +36,52 @@ interface DealFlag {
   keywords: string[]
 }
 
-const UNIQUE_TICKERS = [...new Set(COMPANIES.map(c => c.ticker))]
+function fmt(v: number | null, d = 2): string {
+  if (v == null) return '—'
+  return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
+}
 
 function pct(v: number | null): string {
   if (v == null) return '—'
-  const sign = v >= 0 ? '+' : ''
-  return `${sign}${v.toFixed(2)}%`
+  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 }
 
 function pctClass(v: number | null): string {
   if (v == null) return 'price-flat'
-  if (v > 0) return 'price-up'
-  if (v < 0) return 'price-down'
-  return 'price-flat'
+  return v > 0 ? 'price-up' : v < 0 ? 'price-down' : 'price-flat'
 }
 
-function fmtPrice(v: number | null): string {
+function fmtCap(v: number | null): string {
   if (v == null) return '—'
-  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (v >= 1e12) return `${(v / 1e12).toFixed(1)}T`
+  if (v >= 1e9)  return `${(v / 1e9).toFixed(1)}B`
+  if (v >= 1e6)  return `${(v / 1e6).toFixed(1)}M`
+  return String(v)
 }
 
 function fmtVol(v: number | null): string {
   if (v == null) return '—'
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
+  if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`
+  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`
   return String(v)
 }
+
+function volRatioDisplay(vol: number | null, avg: number | null): { text: string; highlight: boolean } {
+  if (vol == null || avg == null || avg === 0) return { text: '—', highlight: false }
+  const r = vol / avg
+  return { text: `${r.toFixed(2)}×`, highlight: r >= 2 }
+}
+
+type SortKey = 'weight' | 'name' | 'changePct' | 'change5d' | 'volumeRatio'
 
 export default function SignalDashboardPage() {
   const [prices, setPrices] = useState<PriceData[]>([])
   const [dealFlags, setDealFlags] = useState<DealFlag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tierFilter, setTierFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'name' | 'change1d' | 'change5d' | 'weight'>('weight')
+  const [tierFilter, setTierFilter] = useState('all')
+  const [sortBy, setSortBy] = useState<SortKey>('weight')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -82,76 +108,66 @@ export default function SignalDashboardPage() {
     flagMap.get(f.ticker)!.push(f)
   }
 
-  // Build rows: deduplicated by ticker, attach tier info from first match
+  // Deduplicate companies by ticker
   const seen = new Set<string>()
-  const rows: Array<{
-    ticker: string; name: string; region: string; tier: string; weight: number
-  }> = []
+  const rows: Array<{ ticker: string; name: string; region: string; tier: string; weight: number }> = []
   for (const c of COMPANIES) {
     if (seen.has(c.ticker)) continue
     seen.add(c.ticker)
-    rows.push({
-      ticker: c.ticker,
-      name: c.name,
-      region: c.region,
-      tier: c.tier,
-      weight: getWeight(c.tier),
-    })
+    rows.push({ ticker: c.ticker, name: c.name, region: c.region, tier: c.tier, weight: getWeight(c.tier) })
   }
 
   const filtered = tierFilter === 'all' ? rows : rows.filter(r => r.tier === tierFilter)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'weight') return b.weight - a.weight
-    if (sortBy === 'name') return a.name.localeCompare(b.name)
+    if (sortBy === 'name')   return a.name.localeCompare(b.name)
     const pa = priceMap.get(a.ticker)
     const pb = priceMap.get(b.ticker)
-    const va = sortBy === 'change1d' ? (pa?.change1d ?? null) : (pa?.change5d ?? null)
-    const vb = sortBy === 'change1d' ? (pb?.change1d ?? null) : (pb?.change5d ?? null)
-    if (va == null && vb == null) return 0
-    if (va == null) return 1
-    if (vb == null) return -1
-    return vb - va
+    if (sortBy === 'changePct') {
+      const va = pa?.changePct ?? null
+      const vb = pb?.changePct ?? null
+      if (va == null && vb == null) return 0
+      return (vb ?? -Infinity) - (va ?? -Infinity)
+    }
+    if (sortBy === 'change5d') {
+      const va = pa?.change5d ?? null
+      const vb = pb?.change5d ?? null
+      return (vb ?? -Infinity) - (va ?? -Infinity)
+    }
+    if (sortBy === 'volumeRatio') {
+      const ra = pa?.volume != null && pa?.volumeAvg ? pa.volume / pa.volumeAvg : 0
+      const rb = pb?.volume != null && pb?.volumeAvg ? pb.volume / pb.volumeAvg : 0
+      return rb - ra
+    }
+    return 0
   })
 
   return (
     <>
       <div className="page-header">
         <h1>Signal Dashboard</h1>
-        <p>
-          Price and volume from Google Sheets (primary) or Yahoo Finance (fallback). Deal flags from daily cron.
-        </p>
+        <p>Price and market data from Google Sheets (primary) or Yahoo Finance (fallback). Click any row to open the full company view.</p>
       </div>
 
       <div className="disclaimer">
-        <strong>For information only.</strong> Price, volume, and deal signals are raw data points.
+        <strong>For information only.</strong> All figures are raw data points.
         This dashboard <strong>never synthesizes</strong> these into buy/sell/hold recommendations.
         Nothing here constitutes investment advice.
       </div>
 
       <div className="filter-row">
-        <select
-          className="filter-select"
-          value={tierFilter}
-          onChange={e => setTierFilter(e.target.value)}
-        >
+        <select className="filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
           <option value="all">All Tiers</option>
-          {TIERS.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          {TIERS.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-
-        <select
-          className="filter-select"
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value as typeof sortBy)}
-        >
+        <select className="filter-select" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
           <option value="weight">Sort: Chokepoint Weight</option>
-          <option value="change1d">Sort: 1-Day Change</option>
+          <option value="changePct">Sort: Day Change %</option>
           <option value="change5d">Sort: 5-Day Change</option>
+          <option value="volumeRatio">Sort: Volume Ratio</option>
           <option value="name">Sort: Name</option>
         </select>
-
         <button className="btn btn-outline" onClick={fetchData} disabled={loading}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
@@ -168,39 +184,100 @@ export default function SignalDashboardPage() {
               <tr>
                 <th>Company</th>
                 <th>Ticker</th>
-                <th>Tier</th>
                 <th>Chokepoint</th>
                 <th>Price</th>
+                <th>Change</th>
                 <th>1D %</th>
                 <th>5D %</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Day Range</th>
                 <th>Volume</th>
-                <th>Source</th>
-                <th>Deal Flags</th>
+                <th style={{ whiteSpace: 'nowrap', color: 'var(--yellow)' }}>Vol/Avg ↑</th>
+                <th>Mkt Cap</th>
+                <th>P/E</th>
+                <th>Beta</th>
+                <th>SMA50</th>
+                <th>SMA200</th>
+                <th style={{ whiteSpace: 'nowrap' }}>52W L–H</th>
+                <th>Flags</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map(row => {
-                const price = priceMap.get(row.ticker)
+                const p = priceMap.get(row.ticker)
                 const flags = flagMap.get(row.ticker) ?? []
+                const { text: volRatio, highlight: volHi } = volRatioDisplay(p?.volume ?? null, p?.volumeAvg ?? null)
                 return (
-                  <tr key={row.ticker}>
-                    <td style={{ fontWeight: 500 }}>{row.name}</td>
-                    <td><code style={{ fontSize: '0.75rem' }}>{row.ticker}</code></td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{row.tier}</td>
+                  <tr
+                    key={row.ticker}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => window.location.href = `/company/${row.ticker}`}
+                  >
+                    <td>
+                      <Link
+                        href={`/company/${row.ticker}`}
+                        style={{ fontWeight: 500, color: 'var(--text)' }}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {row.name}
+                      </Link>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{row.region}</div>
+                    </td>
+                    <td><code style={{ fontSize: '0.72rem' }}>{row.ticker}</code></td>
                     <td>
                       <span className={`weight-badge weight-${row.weight}`}>
                         {getLabel(row.tier)} ({row.weight})
                       </span>
                     </td>
-                    <td style={{ fontFamily: 'monospace' }}>{fmtPrice(price?.price ?? null)}</td>
-                    <td className={pctClass(price?.change1d ?? null)}>{pct(price?.change1d ?? null)}</td>
-                    <td className={pctClass(price?.change5d ?? null)}>{pct(price?.change5d ?? null)}</td>
-                    <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>{fmtVol(price?.volume ?? null)}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{price?.source ?? '—'}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                      {p?.price != null ? `$${fmt(p.price)}` : '—'}
+                    </td>
+                    <td className={pctClass(p?.changePct ?? null)} style={{ fontFamily: 'monospace' }}>
+                      {p?.change != null ? `${p.change >= 0 ? '+' : ''}${fmt(p.change)}` : '—'}
+                    </td>
+                    <td className={pctClass(p?.changePct ?? null)}>{pct(p?.changePct ?? null)}</td>
+                    <td className={pctClass(p?.change5d ?? null)}>{pct(p?.change5d ?? null)}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {p?.low != null && p?.high != null
+                        ? <span><span className="price-down">{fmt(p.low)}</span>–<span className="price-up">{fmt(p.high)}</span></span>
+                        : '—'}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {fmtVol(p?.volume ?? null)}
+                    </td>
+                    <td
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.82rem',
+                        fontWeight: volHi ? 700 : 400,
+                        color: volHi ? 'var(--yellow)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {volRatio}
+                    </td>
+                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {fmtCap(p?.marketCap ?? null)}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                      {fmt(p?.pe ?? null, 1)}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {fmt(p?.beta ?? null, 2)}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {p?.sma50 != null ? `$${fmt(p.sma50, 0)}` : '—'}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {p?.sma200 != null ? `$${fmt(p.sma200, 0)}` : '—'}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {p?.low52 != null && p?.high52 != null
+                        ? `${fmt(p.low52, 0)}–${fmt(p.high52, 0)}`
+                        : '—'}
+                    </td>
                     <td>
                       {flags.length > 0 ? (
                         <span className="badge badge-deal" title={flags.map(f => f.headline).join('\n')}>
-                          {flags.length} flag{flags.length > 1 ? 's' : ''}
+                          {flags.length}
                         </span>
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>—</span>
@@ -221,7 +298,9 @@ export default function SignalDashboardPage() {
             {dealFlags.slice(0, 20).map((f, i) => (
               <div key={i} className="card" style={{ padding: '0.6rem 0.9rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                  <code style={{ fontSize: '0.75rem', color: 'var(--accent-hover)', flexShrink: 0 }}>{f.ticker}</code>
+                  <Link href={`/company/${f.ticker}`}>
+                    <code style={{ fontSize: '0.75rem', color: 'var(--accent-hover)' }}>{f.ticker}</code>
+                  </Link>
                   <span style={{ fontSize: '0.8rem', flex: 1 }}>{f.headline}</span>
                   <span className={`badge badge-${f.source === 'sec-edgar' ? 'sec' : f.source === 'pr-wire' ? 'wire' : 'deal'}`}>
                     {f.source}
